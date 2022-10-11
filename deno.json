@@ -1,5 +1,5 @@
 {
   "tasks": {
-  },
-  "importMap": "./importMap.json"
+    "wasmbuild": "deno run -A https://deno.land/x/wasmbuild@0.10.0/main.ts"
+  }
 }
