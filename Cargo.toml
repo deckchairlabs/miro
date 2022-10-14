@@ -5,4 +5,4 @@ members = ["rs_lib"]
 codegen-units = 1
 incremental = true
 lto = true
-opt-level = "s"
+opt-level = 3

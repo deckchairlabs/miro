@@ -1,5 +1,5 @@
 [package]
-name = "picasso"
+name = "miro"
 version = "0.0.0-experimental.0"
 edition = "2021"
 
@@ -8,7 +8,6 @@ crate_type = ["cdylib"]
 
 [dependencies]
 wasm-bindgen = "0.2.83"
-wasm-bindgen-futures = "0.4.33"
 js-sys = "0.3.60"
 serde = { version = "1.0.145", features = ["derive"] }
 serde-wasm-bindgen = "0.4.5"
@@ -19,6 +18,6 @@ version = "0.3.60"
 features = ["console"]
 
 [dependencies.image]
-version = "0.24.3"
+version = "0.24.4"
 default-features = false
-features = ["jpeg", "png", "webp"]
+features = ["jpeg", "png"]
