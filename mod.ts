@@ -1,48 +1,25 @@
-import { instantiate } from "./lib/miro.generated.js";
+import { base64encode } from "./src/deps.ts";
+import { miro } from "./src/handler.ts";
+import { importKey, sign } from "./src/signature.ts";
 
-type MiroOptions = {
-  prefix?: string;
-};
+const secretKey =
+  "943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881";
 
-export function miro(options: MiroOptions = {}) {
-  const { prefix = "/miro" } = options;
+const requestHandler = await miro({
+  baseUrl: import.meta.url,
+  secretKey,
+});
 
-  const pattern = new URLPattern({
-    pathname: `${prefix}/:signature/:processingOptions/{:sourceUrl(.+)}`,
-  });
+const path = `/rs:100:100,c:0:0:100/${base64encode("test/miro.jpg")}`;
 
-  return async function middleware(
-    request: Request,
-  ): Promise<Response | undefined> {
-    const requestUrl = new URL(request.url);
-    const match = pattern.exec({ pathname: requestUrl.pathname });
+const key = await importKey(secretKey);
+const signature = await sign(key, path);
 
-    if (!match) {
-      return;
-    }
-
-    await instantiate();
-
-    console.log(match);
-
-    return new Response("hello", {
-      status: 200,
-      headers: {
-        "cache-control": "",
-      },
-    });
-  };
-}
-
-const middleware = miro();
-
-await middleware(
-  new Request(
-    new URL(
-      "http://example.com/miro/1234567890/resize:100:100,crop:0:0:100/fixture/testing.png",
-    ),
-  ),
+const url = new URL(
+  `http://example.com/miro/${signature}${path}`,
 );
+
+await requestHandler(new Request(url));
 
 // const buffer = await fetch("https://via.placeholder.com/1000.png").then(
 //   (response) => response.arrayBuffer(),
