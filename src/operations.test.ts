@@ -36,8 +36,16 @@ Deno.test("it can encode operations", () => {
     encode({
       name: "resize",
       width: 100,
-      height: 100,
     }),
     "resize:100:100",
+  );
+
+  assertEquals(
+    encode({
+      name: "resize",
+      width: 100,
+      height: 200,
+    }),
+    "resize:100:200",
   );
 });

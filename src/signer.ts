@@ -1,4 +1,5 @@
 import { base64decode, base64encode } from "./deps.ts";
+import { ImageURL } from "./image.ts";
 
 const encoder = new TextEncoder();
 
@@ -21,22 +22,27 @@ export class Signer {
     return new Signer(key, algorithm);
   }
 
-  async sign(data: string) {
+  async sign(url: ImageURL) {
     const signature = await crypto.subtle.sign(
       this.algorithm.name,
       this.key,
-      encoder.encode(data),
+      encoder.encode(url.toString()),
     );
 
-    return base64encode(signature);
+    const encodedSignature = base64encode(signature);
+    return "/" + encodedSignature + url.toString();
   }
 
-  verify(signature: string, data: string) {
+  verify(url: ImageURL) {
+    if (!url.signature) {
+      throw new Error("Cannot verify an ImageURL without a signature.");
+    }
+
     return crypto.subtle.verify(
       this.algorithm.name,
       this.key,
-      base64decode(signature),
-      encoder.encode(data),
+      base64decode(url.signature),
+      encoder.encode(url.toString()),
     );
   }
 }

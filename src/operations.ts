@@ -1,5 +1,4 @@
 import { Pipeline } from "../lib/miro.generated.js";
-import { notEmpty } from "./utils.ts";
 
 export type ResizeOperation = {
   name: "resize" | "rs";
@@ -55,16 +54,19 @@ export function decode(value: string): Operation | undefined {
 }
 
 export function encode(op: Operation) {
+  let segments: (string | number)[] = [];
   switch (op.name) {
     case "rs":
     case "resize":
-      return [op.name, op.width, op.height].filter(notEmpty).join(":");
+      segments = [op.name, op.width, op.height ?? op.width];
+      break;
     case "c":
     case "crop":
-      return [op.name, op.x, op.y, op.width, op.height].filter(notEmpty).join(
-        ":",
-      );
+      segments = [op.name, op.x, op.y, op.width, op.height ?? op.width];
+      break;
   }
+
+  return segments.join(":");
 }
 
 export function apply(operations: Required<Operation>[], pipeline: Pipeline) {
