@@ -2,7 +2,7 @@ import { assertEquals } from "https://deno.land/std@0.159.0/testing/asserts.ts";
 import { decode, encode } from "./operations.ts";
 
 Deno.test("it can decode operations", () => {
-  assertEquals(decode("rs:100"), {
+  assertEquals(decode("rs:100:100"), {
     name: "resize",
     width: 100,
     height: 100,
@@ -14,7 +14,7 @@ Deno.test("it can decode operations", () => {
     height: 200,
   });
 
-  assertEquals(decode("c:0:0:100"), {
+  assertEquals(decode("c:0:0:100:100"), {
     name: "crop",
     x: 0,
     y: 0,

@@ -17,48 +17,41 @@ export type CropOperation = {
 
 export type Operation = ResizeOperation | CropOperation;
 
-const resize = new URLPattern({
-  pathname: ":op(rs|resize){\\::width}{\\::height}?",
-});
-
-const crop = new URLPattern({
-  pathname: ":op(c|crop){\\::x}{\\::y}{\\::width}{\\::height}?",
-});
+const resize = ":name(rs|resize){\\::width}{\\::height}";
+const crop = ":name(c|crop){\\::x}{\\::y}{\\::width}{\\::height}";
 
 const patterns = [
   resize,
   crop,
-];
+].map((pathname) => new URLPattern({ pathname }));
 
-export function decode(value: string) {
-  const options = value.split(",");
+export function decode(value: string): Operation | undefined {
+  const pattern = patterns.find((pattern) => pattern.test({ pathname: value }));
+  if (!pattern) {
+    return;
+  }
 
-  return options.flatMap((option) =>
-    patterns.filter((operation) => operation.test({ pathname: option })).map(
-      (operation): Required<Operation> | undefined => {
-        const groups = operation.exec({ pathname: option })?.pathname.groups;
-        if (groups) {
-          const { op, ...args } = groups;
-          switch (op) {
-            case "rs":
-            case "resize": {
-              const width = Number(args.width);
-              const height = args.height ? Number(args.height) : width;
-              return { name: "resize", width, height };
-            }
-            case "c":
-            case "crop": {
-              const x = Number(args.x);
-              const y = Number(args.y);
-              const width = Number(args.width);
-              const height = args.height ? Number(args.height) : width;
-              return { name: "crop", x, y, width, height };
-            }
-          }
-        }
-      },
-    )
-  ).filter(notEmpty);
+  const groups = pattern.exec({ pathname: value })?.pathname.groups;
+
+  if (groups) {
+    const { name, ...args } = groups;
+    switch (name) {
+      case "rs":
+      case "resize": {
+        const width = Number(args.width);
+        const height = Number(args.height || width);
+        return { name: "resize", width, height };
+      }
+      case "c":
+      case "crop": {
+        const x = Number(args.x);
+        const y = Number(args.y);
+        const width = Number(args.width);
+        const height = Number(args.height || width);
+        return { name: "crop", x, y, width, height };
+      }
+    }
+  }
 }
 
 export function encode(op: Operation) {
