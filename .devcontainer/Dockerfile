@@ -9,7 +9,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends binaryen
 
 ENV DENO_INSTALL=/deno
-ENV DENO_VERSION=v1.26.1
+ENV DENO_VERSION=v1.26.2
 
 RUN mkdir -p /deno \
     && curl -fsSL https://deno.land/x/install/install.sh | sh -s ${DENO_VERSION} \

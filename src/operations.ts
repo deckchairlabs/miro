@@ -1,4 +1,21 @@
-export type ParsedOperation = [name: string, args: Record<string, string>];
+import { Pipeline } from "../lib/miro.generated.js";
+import { notEmpty } from "./utils.ts";
+
+export type ResizeOperation = {
+  name: "resize" | "rs";
+  width: number;
+  height?: number;
+};
+
+export type CropOperation = {
+  name: "crop" | "c";
+  x: number;
+  y: number;
+  width: number;
+  height?: number;
+};
+
+export type Operation = ResizeOperation | CropOperation;
 
 const resize = new URLPattern({
   pathname: ":op(rs|resize){\\::width}{\\::height}?",
@@ -8,23 +25,73 @@ const crop = new URLPattern({
   pathname: ":op(c|crop){\\::x}{\\::y}{\\::width}{\\::height}?",
 });
 
-const operations = [resize, crop];
+const patterns = [
+  resize,
+  crop,
+];
 
-function notEmpty<TValue>(value: TValue | null | undefined): value is TValue {
-  return value !== null && value !== undefined;
-}
+export function decode(value: string) {
+  const options = value.split(",");
 
-export function parse(processingOptions: string) {
-  const options = processingOptions.split(",");
   return options.flatMap((option) =>
-    operations.filter((operation) => operation.test({ pathname: option })).map(
-      (operation): ParsedOperation | undefined => {
+    patterns.filter((operation) => operation.test({ pathname: option })).map(
+      (operation): Required<Operation> | undefined => {
         const groups = operation.exec({ pathname: option })?.pathname.groups;
         if (groups) {
           const { op, ...args } = groups;
-          return [op, args];
+          switch (op) {
+            case "rs":
+            case "resize": {
+              const width = Number(args.width);
+              const height = args.height ? Number(args.height) : width;
+              return { name: "resize", width, height };
+            }
+            case "c":
+            case "crop": {
+              const x = Number(args.x);
+              const y = Number(args.y);
+              const width = Number(args.width);
+              const height = args.height ? Number(args.height) : width;
+              return { name: "crop", x, y, width, height };
+            }
+          }
         }
       },
     )
   ).filter(notEmpty);
+}
+
+export function encode(op: Operation) {
+  switch (op.name) {
+    case "rs":
+    case "resize":
+      return [op.name, op.width, op.height].filter(notEmpty).join(":");
+    case "c":
+    case "crop":
+      return [op.name, op.x, op.y, op.width, op.height].filter(notEmpty).join(
+        ":",
+      );
+  }
+}
+
+export function apply(operations: Required<Operation>[], pipeline: Pipeline) {
+  for (const operation of operations) {
+    switch (operation.name) {
+      case "rs":
+      case "resize":
+        pipeline = pipeline.resize(operation.width, operation.height);
+        break;
+      case "c":
+      case "crop":
+        pipeline = pipeline.crop(
+          operation.x,
+          operation.y,
+          operation.width,
+          operation.height,
+        );
+        break;
+    }
+  }
+
+  return pipeline;
 }

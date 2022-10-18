@@ -1,51 +1,84 @@
-import { instantiate } from "../lib/miro.generated.js";
-import { base64decode } from "./deps.ts";
-import { importKey, verify } from "./signature.ts";
+import { instantiate, Pipeline } from "../lib/miro.generated.js";
+import { base64decode, typeByExtension } from "./deps.ts";
+import { notEmpty } from "./utils.ts";
+import { apply, decode } from "./operations.ts";
 
-type MiroOptions = {
+export type MiroOptions = {
   secretKey: string;
   baseUrl?: string;
   pathPrefix?: string;
-  allowOrigin?: string[];
+  remotePatterns?: URLPatternInit[];
 };
 
-export async function miro(options: MiroOptions) {
+type CreateRequestHandlerOptions = {
+  verify(signature: string, path: string): Promise<boolean>;
+  baseUrl?: string;
+  pathPrefix?: string;
+  remotePatterns?: URLPatternInit[];
+};
+
+export function createRequestHandler(
+  options: CreateRequestHandlerOptions,
+) {
   const {
-    secretKey,
+    verify,
     baseUrl = import.meta.url,
     pathPrefix = "/miro",
-    allowOrigin = [],
+    remotePatterns,
   } = options;
 
-  const signingKey = await importKey(secretKey);
-
-  const pattern = new URLPattern({
-    pathname:
-      `${pathPrefix}/:signature/:operations/{:encodedSourceUrl}{.:extension}?`,
-  });
+  const patterns = [
+    `/:signature/:encodedOperations/{:encodedSourceUrl}{.:extension}?`,
+    `/:signature/{:encodedSourceUrl}{.:extension}?`,
+  ].map((pathname) => new URLPattern({ pathname }));
 
   return async function requestHandler(
     request: Request,
   ): Promise<Response | undefined> {
     const requestUrl = new URL(request.url);
-    const match = pattern.exec({
-      pathname: requestUrl.pathname,
-    });
+    const pathname = requestUrl.pathname.replace(pathPrefix, "");
 
-    if (!match) {
+    const matchedPattern = patterns.find((pattern) =>
+      pattern.test({ pathname })
+    );
+
+    if (!matchedPattern) {
       return;
     }
 
+    const match = matchedPattern.exec({ pathname })!;
+
     const {
       signature,
-      operations,
+      encodedOperations,
       encodedSourceUrl,
       extension,
     } = match.pathname.groups;
 
     // Verify the signature
-    const path = `/${operations}/${encodedSourceUrl}`;
-    const verified = await verify(signingKey, signature, path);
+    const pathSegments = [encodedOperations, encodedSourceUrl].filter(notEmpty);
+    const path = `/${pathSegments.join("/")}${
+      extension ? `.${extension}` : ""
+    }`;
+
+    const verified = await verify(signature, path);
+    const decodedSourceUrl = new TextDecoder().decode(
+      base64decode(encodedSourceUrl),
+    );
+
+    const isRemoteSource = decodedSourceUrl.startsWith("http");
+    const sourceUrl = isRemoteSource
+      ? new URL(decodedSourceUrl)
+      : new URL(decodedSourceUrl, baseUrl);
+
+    // Check remote source is allowed
+    const isAllowedRemote = remotePatterns?.some((pattern) =>
+      new URLPattern(pattern).test(sourceUrl)
+    );
+
+    if (isRemoteSource && !isAllowedRemote) {
+      throw new Error("Remote source is not allowed.");
+    }
 
     if (!verified) {
       throw new Error("Signature verification failed.");
@@ -53,21 +86,25 @@ export async function miro(options: MiroOptions) {
 
     await instantiate();
 
-    const decodedSourceUrl = new TextDecoder().decode(
-      base64decode(encodedSourceUrl),
+    const operations = encodedOperations.split(",").map(decode).filter(
+      notEmpty,
+    );
+    const pipeline = apply(operations, new Pipeline());
+    const contentType = typeByExtension(extension);
+
+    const source = await fetch(sourceUrl.href).then((response) =>
+      response.arrayBuffer()
     );
 
-    const sourceUrl = decodedSourceUrl.startsWith("http")
-      ? new URL(decodedSourceUrl)
-      : new URL(decodedSourceUrl, baseUrl);
+    const transformed = pipeline.execute(new Uint8Array(source));
 
-    console.log(sourceUrl.href);
+    const headers = new Headers();
+    headers.set("content-type", contentType!);
+    headers.set("cache-control", "public, max-age=604800, immutable");
 
-    return new Response("hello", {
+    return new Response(transformed, {
       status: 200,
-      headers: {
-        // "cache-control": "public, max-age=604800, immutable",
-      },
+      headers,
     });
   };
 }
