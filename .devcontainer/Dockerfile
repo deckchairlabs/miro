@@ -9,7 +9,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends binaryen
 
 ENV DENO_INSTALL=/deno
-ENV DENO_VERSION=v1.26.2
+ENV DENO_VERSION=v1.27.0
 
 RUN mkdir -p /deno \
     && curl -fsSL https://deno.land/x/install/install.sh | sh -s ${DENO_VERSION} \
@@ -17,3 +17,8 @@ RUN mkdir -p /deno \
 
 ENV PATH=${DENO_INSTALL}/bin:${PATH} \
     DENO_DIR=${DENO_INSTALL}/.cache/deno
+
+USER vscode
+
+RUN deno install --allow-read --allow-write --allow-run -f -n publish https://deno.land/x/publish@v1.15.0/cli.ts
+ENV PATH="/home/vscode/.deno/bin:$PATH"

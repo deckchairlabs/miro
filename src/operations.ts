@@ -1,4 +1,4 @@
-import { Pipeline } from "../lib/miro.generated.js";
+import { type Pipeline } from "../lib/miro.generated.js";
 
 export type ResizeOperation = {
   name: "resize" | "rs";
@@ -55,6 +55,7 @@ export function decode(value: string): Operation | undefined {
 
 export function encode(op: Operation) {
   let segments: (string | number)[] = [];
+
   switch (op.name) {
     case "rs":
     case "resize":

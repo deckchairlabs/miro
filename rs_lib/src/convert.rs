@@ -13,6 +13,7 @@ pub enum SupportedImageFormat {
   Jpg = "jpg",
   Png = "png",
   WebP = "webp",
+  Avif = "avif",
 }
 
 #[allow(clippy::from_over_into)]
@@ -24,6 +25,7 @@ impl Into<ImageFormat> for SupportedImageFormat {
       }
       SupportedImageFormat::Png => ImageFormat::Png,
       SupportedImageFormat::WebP => ImageFormat::WebP,
+      SupportedImageFormat::Avif => ImageFormat::Avif,
       SupportedImageFormat::__Nonexhaustive => todo!(),
     }
   }
@@ -35,6 +37,7 @@ impl From<ImageFormat> for SupportedImageFormat {
       ImageFormat::Png => SupportedImageFormat::Png,
       ImageFormat::Jpeg => SupportedImageFormat::Jpeg,
       ImageFormat::WebP => SupportedImageFormat::WebP,
+      ImageFormat::Avif => SupportedImageFormat::Avif,
       _ => unimplemented!(),
     }
   }
