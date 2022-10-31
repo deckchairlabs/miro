@@ -3,11 +3,11 @@ import { base64decode, base64encode } from "./deps.ts";
 import { notEmpty } from "./utils.ts";
 
 const securePattern = new URLPattern({
-  pathname: "/:signature/:encodedOperations/{:encodedHref}{.:extension}?",
+  pathname: "/:signature/:encodedOperations/{:encodedHref}{.:format}?",
 });
 
 const insecurePattern = new URLPattern({
-  pathname: "/insecure/:encodedOperations/{:encodedHref}{.:extension}?",
+  pathname: "/insecure/:encodedOperations/{:encodedHref}{.:format}?",
 });
 
 export class ImageURL {
@@ -17,7 +17,7 @@ export class ImageURL {
   constructor(
     href: string | URL,
     operations: Operation[] = [],
-    public extension?: string,
+    public format?: string,
     public signature?: string,
   ) {
     this.href = String(href);
@@ -71,10 +71,10 @@ export class ImageURL {
 }
 
 type PatternMatchGroups = {
-  encodedHref: string;
-  encodedOperations: string;
-  extension?: string;
   signature?: string;
+  encodedOperations: string;
+  encodedHref: string;
+  format?: string;
 };
 
 export function imageUrlFromPatternMatchGroups(groups: PatternMatchGroups) {
@@ -83,5 +83,5 @@ export function imageUrlFromPatternMatchGroups(groups: PatternMatchGroups) {
     notEmpty,
   );
 
-  return new ImageURL(href, operations, groups.extension, groups.signature);
+  return new ImageURL(href, operations, groups.format, groups.signature);
 }

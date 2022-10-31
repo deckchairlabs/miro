@@ -69,12 +69,15 @@ export function encode(op: Operation) {
   return segments.join(":");
 }
 
-export function apply(operations: Required<Operation>[], pipeline: Pipeline) {
+export function apply(operations: Operation[], pipeline: Pipeline) {
   for (const operation of operations) {
     switch (operation.name) {
       case "rs":
       case "resize":
-        pipeline = pipeline.resize(operation.width, operation.height);
+        pipeline = pipeline.resize(
+          operation.width,
+          operation.height ?? operation.width,
+        );
         break;
       case "c":
       case "crop":
@@ -82,7 +85,7 @@ export function apply(operations: Required<Operation>[], pipeline: Pipeline) {
           operation.x,
           operation.y,
           operation.width,
-          operation.height,
+          operation.height ?? operation.width,
         );
         break;
     }

@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.159.0/http/server.ts";
-import { Hono } from "https://deno.land/x/hono@v2.2.5/mod.ts";
+import { serve } from "https://deno.land/std@0.161.0/http/server.ts";
+import { Hono } from "https://deno.land/x/hono@v2.3.2/mod.ts";
 import { createMiro } from "./mod.ts";
 
 const app = new Hono();
@@ -11,15 +11,21 @@ const miro = await createMiro({
   baseUrl: import.meta.url,
   secretKey,
   pathPrefix: "/miro",
-  remotePatterns: [{
-    protocol: "https",
+  allowedOrigins: [{
     hostname: "www.placecage.com",
   }],
 });
 
-const pathname = await miro.sign("https://www.placecage.com/500/500");
+const encoded = await miro.encode("https://www.placecage.com/500/500", [{
+  name: "resize",
+  width: 100,
+}]);
 
-console.log(`http://localhost:8000${pathname}`);
+app.get("/", (context) => {
+  return context.html(`
+    <img src="${encoded}" />
+  `);
+});
 
 app.get("/miro/*", (context) => miro.handleRequest(context.req));
 

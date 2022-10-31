@@ -1,36 +1,31 @@
 import { instantiate, Pipeline } from "../lib/miro.generated.js";
-import { base64decode, typeByExtension } from "./deps.ts";
-import { notEmpty } from "./utils.ts";
-import { apply, decode } from "./operations.ts";
+import { apply } from "./operations.ts";
+import { ImageURL } from "./image.ts";
+import { Signer } from "./signer.ts";
 
 export type MiroOptions = {
   secretKey: string;
   baseUrl?: string;
   pathPrefix?: string;
-  remotePatterns?: URLPatternInit[];
+  allowedOrigins?: URLPatternInit[];
 };
 
 type CreateRequestHandlerOptions = {
-  verify(signature: string, path: string): Promise<boolean>;
+  signer?: Signer;
   baseUrl?: string;
   pathPrefix?: string;
-  remotePatterns?: URLPatternInit[];
+  allowedOrigins?: URLPatternInit[];
 };
 
 export function createRequestHandler(
   options: CreateRequestHandlerOptions,
 ) {
   const {
-    verify,
+    signer,
     baseUrl = import.meta.url,
     pathPrefix = "/miro",
-    remotePatterns,
+    allowedOrigins = [],
   } = options;
-
-  const patterns = [
-    `/:signature/:encodedOperations/{:encodedSourceUrl}{.:extension}?`,
-    `/:signature/{:encodedSourceUrl}{.:extension}?`,
-  ].map((pathname) => new URLPattern({ pathname }));
 
   return async function requestHandler(
     request: Request,
@@ -38,69 +33,53 @@ export function createRequestHandler(
     const requestUrl = new URL(request.url);
     const pathname = requestUrl.pathname.replace(pathPrefix, "");
 
-    const matchedPattern = patterns.find((pattern) =>
-      pattern.test({ pathname })
-    );
+    // Verify the incomming request
+    const isInsecure = pathname.startsWith("/insecure");
+    const image = isInsecure
+      ? ImageURL.fromUnsigned(pathname)
+      : ImageURL.fromSigned(pathname);
 
-    if (!matchedPattern) {
-      return;
+    // If we have a signer, insecure URL's are not allowed
+    if (isInsecure && signer) {
+      throw new Error("Insecure URLs are not allowed.");
     }
 
-    const match = matchedPattern.exec({ pathname })!;
-
-    const {
-      signature,
-      encodedOperations,
-      encodedSourceUrl,
-      extension,
-    } = match.pathname.groups;
-
-    // Verify the signature
-    const pathSegments = [encodedOperations, encodedSourceUrl].filter(notEmpty);
-    const path = `/${pathSegments.join("/")}${
-      extension ? `.${extension}` : ""
-    }`;
-
-    const verified = await verify(signature, path);
-    const decodedSourceUrl = new TextDecoder().decode(
-      base64decode(encodedSourceUrl),
-    );
-
-    const isRemoteSource = decodedSourceUrl.startsWith("http");
-    const sourceUrl = isRemoteSource
-      ? new URL(decodedSourceUrl)
-      : new URL(decodedSourceUrl, baseUrl);
-
-    // Check remote source is allowed
-    const isAllowedRemote = remotePatterns?.some((pattern) =>
-      new URLPattern(pattern).test(sourceUrl)
-    );
-
-    if (isRemoteSource && !isAllowedRemote) {
-      throw new Error("Remote source is not allowed.");
-    }
+    const shouldVerify = signer !== undefined;
+    const verified = shouldVerify === false ||
+      shouldVerify && await signer.verify(image);
 
     if (!verified) {
       throw new Error("Signature verification failed.");
     }
 
+    const isRemoteSource = image.href.startsWith("http");
+    const sourceUrl = isRemoteSource
+      ? new URL(image.href)
+      : new URL(image.href, baseUrl);
+
+    // Check remote source is allowed
+    const isAllowedRemote = allowedOrigins.some((pattern) =>
+      new URLPattern(pattern).test(sourceUrl)
+    );
+
+    if (isRemoteSource && !isAllowedRemote) {
+      throw new Error(`Remote source is not allowed ${sourceUrl}.`);
+    }
+
     await instantiate();
 
-    const operations = encodedOperations.split(",").map(decode).filter(
-      notEmpty,
-    );
-    const pipeline = apply(operations, new Pipeline());
-    const contentType = typeByExtension(extension);
+    const response = await fetch(sourceUrl.href);
+    const source = await response.arrayBuffer();
 
-    const source = await fetch(sourceUrl.href).then((response) =>
-      response.arrayBuffer()
-    );
-
+    const pipeline = apply(image.operations, new Pipeline());
     const transformed = pipeline.execute(new Uint8Array(source));
 
     const headers = new Headers();
-    headers.set("content-type", contentType!);
     headers.set("cache-control", "public, max-age=604800, immutable");
+    headers.set(
+      "x-miro-content-length",
+      response.headers.get("content-length")!,
+    );
 
     return new Response(transformed, {
       status: 200,

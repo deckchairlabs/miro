@@ -1,13 +1,13 @@
-import { base64encode } from "./src/deps.ts";
 import { createRequestHandler } from "./src/handler.ts";
-import { encode, Operation } from "./src/operations.ts";
+import { ImageURL } from "./src/image.ts";
+import { Operation } from "./src/operations.ts";
 import { Signer } from "./src/signer.ts";
 
 type CreateMiroOptions = {
-  secretKey: string;
+  secretKey?: string;
   pathPrefix?: string;
   baseUrl?: string;
-  remotePatterns?: URLPatternInit[];
+  allowedOrigins?: URLPatternInit[];
 };
 
 export async function createMiro(options: CreateMiroOptions) {
@@ -15,29 +15,29 @@ export async function createMiro(options: CreateMiroOptions) {
     secretKey,
     baseUrl,
     pathPrefix = "/",
-    remotePatterns,
+    allowedOrigins,
   } = options;
 
-  const signer = await Signer.createInstance(secretKey);
+  const signer = secretKey ? await Signer.createInstance(secretKey) : undefined;
 
-  async function sign(sourceUrl: string, operations: Operation[] = []) {
-    const encodedSourceUrl = base64encode(sourceUrl);
-    const encodedOperations = operations.map(encode).join(",");
-    const path = `/${encodedOperations}/${encodedSourceUrl}`;
-    const signature = await signer.sign(path);
+  async function encode(href: string | URL, operations: Operation[] = []) {
+    const image = new ImageURL(href, operations);
+    const path = signer
+      ? await signer.sign(image)
+      : `/insecure${image.toString()}`;
 
-    return `${pathPrefix}/${signature}${path}`;
+    return `${pathPrefix}${path}`;
   }
 
   const handleRequest = createRequestHandler({
-    verify: signer.verify,
+    signer,
     baseUrl,
     pathPrefix,
-    remotePatterns,
+    allowedOrigins,
   });
 
   return {
     handleRequest,
-    sign,
+    encode,
   };
 }
