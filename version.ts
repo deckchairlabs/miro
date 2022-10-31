@@ -1,4 +1,4 @@
-export const VERSION = "0.0.1";
+export const VERSION = "0.0.2";
 
 const VERSION_REGEX = /\/\/deno\.land\/x\/miro@v[\w\.\-]+\//;
 
