@@ -82,10 +82,8 @@ export function createRequestHandler(
 
     const headers = new Headers();
     headers.set("cache-control", "public, max-age=604800, immutable");
-    headers.set(
-      "x-miro-content-length",
-      fetched.headers.get("content-length")!,
-    );
+    headers.set("x-miro-content-length", String(source.byteLength));
+    headers.set("x-miro-cache", "miss");
 
     const response = new Response(transformed, {
       status: 200,
