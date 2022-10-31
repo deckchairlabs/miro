@@ -17,6 +17,7 @@ export function createRequestHandler(
 ) {
   const {
     signer,
+    cache,
     baseUrl,
     pathPrefix = "/miro",
     allowedOrigins = [],
@@ -26,6 +27,13 @@ export function createRequestHandler(
   return async function requestHandler(
     request: Request,
   ): Promise<Response | undefined> {
+    const cached = cache && await cache.match(request);
+
+    if (cached) {
+      cached.headers.set("x-miro-cache", "hit");
+      return cached;
+    }
+
     const requestUrl = new URL(request.url);
     const pathname = requestUrl.pathname.replace(pathPrefix, "");
 
@@ -64,8 +72,10 @@ export function createRequestHandler(
 
     await instantiate();
 
-    const response = await fetch(sourceUrl.href);
-    const source = await response.arrayBuffer();
+    const fetched = await fetch(sourceUrl.href);
+    const source = await fetched.arrayBuffer();
+    const shouldCache = cache !== undefined &&
+      (fetched.ok && fetched.status === 200);
 
     const pipeline = apply(image.operations, new Pipeline());
     const transformed = pipeline.execute(new Uint8Array(source));
@@ -74,12 +84,18 @@ export function createRequestHandler(
     headers.set("cache-control", "public, max-age=604800, immutable");
     headers.set(
       "x-miro-content-length",
-      response.headers.get("content-length")!,
+      fetched.headers.get("content-length")!,
     );
 
-    return new Response(transformed, {
+    const response = new Response(transformed, {
       status: 200,
       headers,
     });
+
+    if (shouldCache) {
+      await cache.put(request, response.clone());
+    }
+
+    return response;
   };
 }
