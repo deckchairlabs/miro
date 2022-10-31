@@ -26,11 +26,10 @@ export class Signer {
     const signature = await crypto.subtle.sign(
       this.algorithm.name,
       this.key,
-      encoder.encode(url.toString()),
+      encoder.encode(url.encode()),
     );
 
-    const encodedSignature = base64encode(signature);
-    return "/" + encodedSignature + url.toString();
+    return ImageURL.signed(url, base64encode(signature));
   }
 
   verify(url: ImageURL) {
@@ -42,7 +41,7 @@ export class Signer {
       this.algorithm.name,
       this.key,
       base64decode(url.signature),
-      encoder.encode(url.toString()),
+      encoder.encode(url.encode()),
     );
   }
 }

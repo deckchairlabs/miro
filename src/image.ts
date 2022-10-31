@@ -3,11 +3,11 @@ import { base64decode, base64encode } from "./deps.ts";
 import { notEmpty } from "./utils.ts";
 
 const securePattern = new URLPattern({
-  pathname: "/:signature/:encodedOperations/{:encodedHref}{.:format}?",
+  pathname: "/:signature/:operations/{:href(.+?)}{.:format}?",
 });
 
 const insecurePattern = new URLPattern({
-  pathname: "/insecure/:encodedOperations/{:encodedHref}{.:format}?",
+  pathname: "/insecure/:operations/{:href(.+?)}{.:format}?",
 });
 
 export class ImageURL {
@@ -15,34 +15,51 @@ export class ImageURL {
   readonly operations: Operation[] = [];
 
   constructor(
-    href: string | URL,
+    href: string,
     operations: Operation[] = [],
     public format?: string,
     public signature?: string,
   ) {
-    this.href = String(href);
+    this.href = href;
     this.operations = operations;
   }
 
-  static fromSigned(signed: string) {
-    const groups = securePattern.exec({ pathname: signed })?.pathname.groups;
-
-    if (!groups) {
-      throw new Error(`Failed to create ImageURL from ${signed}`);
-    }
-
-    return imageUrlFromPatternMatchGroups(groups as PatternMatchGroups);
+  static signed(image: ImageURL, signature: string) {
+    return new ImageURL(image.href, image.operations, image.format, signature);
   }
 
-  static fromUnsigned(unsigned: string) {
-    const groups =
-      insecurePattern.exec({ pathname: unsigned })?.pathname.groups;
+  static decode(pathname: string) {
+    const isInsecure = pathname.startsWith("/insecure");
+
+    const groups = isInsecure
+      ? insecurePattern.exec({ pathname })?.pathname.groups
+      : securePattern.exec({ pathname })?.pathname.groups;
 
     if (!groups) {
-      throw new Error(`Failed to create ImageURL from ${unsigned}`);
+      throw new Error(`Failed to decode ImageURL from ${pathname}`);
     }
 
-    return imageUrlFromPatternMatchGroups(groups as PatternMatchGroups);
+    const href = groups.href.startsWith("plain/")
+      ? groups.href.slice(6)
+      : new TextDecoder().decode(base64decode(groups.href));
+
+    const operations = groups.operations.split(",").map(decode).filter(
+      notEmpty,
+    );
+
+    return new ImageURL(href, operations, groups.format, groups.signature);
+  }
+
+  encode() {
+    const operations = this.operations.length > 0
+      ? this.operations.map(encode).join(",")
+      : undefined;
+
+    const href = base64encode(this.href);
+    const format = this.format ? [".", this.format].join("") : "";
+    const encoded = [operations ?? "raw", href + format].join("/");
+
+    return encoded;
   }
 
   resize(width: number, height?: number) {
@@ -60,28 +77,9 @@ export class ImageURL {
   }
 
   toString(): string {
-    const operations = this.operations.length > 0
-      ? this.operations.map(encode).join(",")
-      : undefined;
+    const encoded = this.encode();
 
-    const pathname = [operations ?? "plain", base64encode(this.href)].join("/");
-
-    return "/" + pathname;
+    return "/" +
+      [this.signature || "insecure", encoded].filter(notEmpty).join("/");
   }
-}
-
-type PatternMatchGroups = {
-  signature?: string;
-  encodedOperations: string;
-  encodedHref: string;
-  format?: string;
-};
-
-export function imageUrlFromPatternMatchGroups(groups: PatternMatchGroups) {
-  const href = new TextDecoder().decode(base64decode(groups.encodedHref));
-  const operations = groups.encodedOperations.split(",").map(decode).filter(
-    notEmpty,
-  );
-
-  return new ImageURL(href, operations, groups.format, groups.signature);
 }

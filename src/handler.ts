@@ -15,6 +15,7 @@ type CreateRequestHandlerOptions = {
   baseUrl?: string;
   pathPrefix?: string;
   allowedOrigins?: URLPatternInit[];
+  allowInsecure?: boolean;
 };
 
 export function createRequestHandler(
@@ -25,6 +26,7 @@ export function createRequestHandler(
     baseUrl = import.meta.url,
     pathPrefix = "/miro",
     allowedOrigins = [],
+    allowInsecure = false,
   } = options;
 
   return async function requestHandler(
@@ -34,13 +36,10 @@ export function createRequestHandler(
     const pathname = requestUrl.pathname.replace(pathPrefix, "");
 
     // Verify the incomming request
-    const isInsecure = pathname.startsWith("/insecure");
-    const image = isInsecure
-      ? ImageURL.fromUnsigned(pathname)
-      : ImageURL.fromSigned(pathname);
+    const image = ImageURL.decode(pathname);
 
-    // If we have a signer, insecure URL's are not allowed
-    if (isInsecure && signer) {
+    // If we have a signer, unsigned URL's are not allowed
+    if (allowInsecure === false && !image.signature && signer) {
       throw new Error("Insecure URLs are not allowed.");
     }
 

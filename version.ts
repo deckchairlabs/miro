@@ -1,5 +1,6 @@
 export const VERSION = "0.0.1";
-export const VERSION_REGEX = /\/\/deno\.land\/x\/miro@v[\w\.\-]+\//;
+
+const VERSION_REGEX = /\/\/deno\.land\/x\/miro@v[\w\.\-]+\//;
 
 /** `prepublish` will be invoked before publish, return `false` to prevent the publish. */
 export async function prepublish(version: string) {

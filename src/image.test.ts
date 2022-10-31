@@ -5,48 +5,89 @@ import {
 import { Signer } from "./signer.ts";
 import { ImageURL } from "./image.ts";
 
-Deno.test("it can create an ImageURL with operations", () => {
-  const url = new ImageURL(new URL("https://www.placecage.com/500/500"))
+const signer = await Signer.createInstance("secret");
+
+Deno.test("it can create an ImageURL with operations", async () => {
+  const unsigned = new ImageURL("https://www.placecage.com/500/500")
     .resize(100, 100)
     .crop(0, 0, 200);
 
-  assertEquals(url.href, "https://www.placecage.com/500/500");
-  assertEquals(url.operations.length, 2);
+  assertEquals(unsigned.href, "https://www.placecage.com/500/500");
+  assertEquals(unsigned.operations.length, 2);
 
   assertEquals(
-    url.toString(),
-    "/resize:100:100,crop:0:0:200:200/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+    unsigned.toString(),
+    "/insecure/resize:100:100,crop:0:0:200:200/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+  );
+
+  const signed = await signer.sign(unsigned);
+  assertEquals(
+    signed.toString(),
+    "/guL0BvU74XYBrf07IjKjS8rppH2ButPUaMAhx8GI9yA/resize:100:100,crop:0:0:200:200/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
   );
 });
 
-Deno.test("it can create an ImageURL without operations", () => {
-  const url = new ImageURL(new URL("https://www.placecage.com/500/500"));
+Deno.test("it can create an encoded ImageURL without operations", async () => {
+  const unsigned = new ImageURL("https://www.placecage.com/500/500");
 
-  assertEquals(url.href, "https://www.placecage.com/500/500");
-  assertEquals(url.operations.length, 0);
+  assertEquals(unsigned.href, "https://www.placecage.com/500/500");
+  assertEquals(unsigned.operations.length, 0);
 
   assertEquals(
-    url.toString(),
-    "/plain/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+    unsigned.toString(),
+    "/insecure/raw/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+  );
+
+  const signed = await signer.sign(unsigned);
+  assertEquals(
+    signed.toString(),
+    "/sQDtPcMRblE15LAWFAU6PMyvCzoF2eiwIf6ty-b5vgM/raw/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
   );
 });
 
-Deno.test("it can create an ImageURL from a signed path", async () => {
-  const signer = await Signer.createInstance("secret");
-  const image = ImageURL.fromSigned(
-    "/UZfCh_VH8kH5zuIGb_iLLjPsT3elYXp3ssYA1IXuvvg/resize:100:100,crop:0:0:200:200/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+Deno.test("it can create an encoded ImageURL without operations", async () => {
+  const unsigned = new ImageURL("https://www.placecage.com/500/500");
+
+  assertEquals(unsigned.href, "https://www.placecage.com/500/500");
+  assertEquals(unsigned.operations.length, 0);
+
+  assertEquals(
+    unsigned.toString(),
+    "/insecure/raw/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+  );
+
+  const signed = await signer.sign(unsigned);
+  assertEquals(
+    signed.toString(),
+    "/sQDtPcMRblE15LAWFAU6PMyvCzoF2eiwIf6ty-b5vgM/raw/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+  );
+});
+
+Deno.test("it can create an ImageURL from a signed encoded url", async () => {
+  const image = ImageURL.decode(
+    "/guL0BvU74XYBrf07IjKjS8rppH2ButPUaMAhx8GI9yA/resize:100:100,crop:0:0:200:200/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
   );
 
   assertEquals(image.href, "https://www.placecage.com/500/500");
   assertEquals(image.operations.length, 2);
-  assertEquals(image.signature, "UZfCh_VH8kH5zuIGb_iLLjPsT3elYXp3ssYA1IXuvvg");
+  assertEquals(image.signature, "guL0BvU74XYBrf07IjKjS8rppH2ButPUaMAhx8GI9yA");
   assertEquals(await signer.verify(image), true);
 });
 
-Deno.test("it can create an ImageURL from an unsigned path", async () => {
-  const signer = await Signer.createInstance("secret");
-  const image = ImageURL.fromUnsigned(
-    "/insecure/resize:100:100,crop:0:0:200:200/aHR0cHM6Ly93d3cucGxhY2VjYWdlLmNvbS81MDAvNTAw",
+Deno.test("it can create an ImageURL from a signed plain url", async () => {
+  const image = ImageURL.decode(
+    "/guL0BvU74XYBrf07IjKjS8rppH2ButPUaMAhx8GI9yA/resize:100:100,crop:0:0:200:200/plain/https://www.placecage.com/500/500",
+  );
+
+  assertEquals(image.href, "https://www.placecage.com/500/500");
+  assertEquals(image.operations.length, 2);
+  assertEquals(image.signature, "guL0BvU74XYBrf07IjKjS8rppH2ButPUaMAhx8GI9yA");
+  assertEquals(await signer.verify(image), true);
+});
+
+Deno.test("it can create an ImageURL from an unsigned path", () => {
+  const image = ImageURL.decode(
+    "/insecure/resize:100:100,crop:0:0:200:200/plain/https://www.placecage.com/500/500",
   );
 
   assertEquals(image.href, "https://www.placecage.com/500/500");
