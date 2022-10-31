@@ -1,13 +1,13 @@
 import { type Pipeline } from "../lib/miro.generated.js";
 
 export type ResizeOperation = {
-  name: "resize" | "rs";
+  name: "resize";
   width: number;
   height?: number;
 };
 
 export type CropOperation = {
-  name: "crop" | "c";
+  name: "crop";
   x: number;
   y: number;
   width: number;
@@ -16,8 +16,8 @@ export type CropOperation = {
 
 export type Operation = ResizeOperation | CropOperation;
 
-const resize = ":name(rs|resize){\\::width}{\\::height}";
-const crop = ":name(c|crop){\\::x}{\\::y}{\\::width}{\\::height}";
+const resize = ":name(resize){\\::width}{\\::height}";
+const crop = ":name(crop){\\::x}{\\::y}{\\::width}{\\::height}";
 
 const patterns = [
   resize,
@@ -35,13 +35,11 @@ export function decode(value: string): Operation | undefined {
   if (groups) {
     const { name, ...args } = groups;
     switch (name) {
-      case "rs":
       case "resize": {
         const width = Number(args.width);
         const height = Number(args.height || width);
         return { name: "resize", width, height };
       }
-      case "c":
       case "crop": {
         const x = Number(args.x);
         const y = Number(args.y);
@@ -57,11 +55,9 @@ export function encode(op: Operation) {
   let segments: (string | number)[] = [];
 
   switch (op.name) {
-    case "rs":
     case "resize":
       segments = [op.name, op.width, op.height ?? op.width];
       break;
-    case "c":
     case "crop":
       segments = [op.name, op.x, op.y, op.width, op.height ?? op.width];
       break;
@@ -73,14 +69,12 @@ export function encode(op: Operation) {
 export function apply(operations: Operation[], pipeline: Pipeline) {
   for (const operation of operations) {
     switch (operation.name) {
-      case "rs":
       case "resize":
         pipeline = pipeline.resize(
           operation.width,
           operation.height ?? operation.width,
         );
         break;
-      case "c":
       case "crop":
         pipeline = pipeline.crop(
           operation.x,

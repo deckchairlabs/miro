@@ -3,15 +3,9 @@ import { apply } from "./operations.ts";
 import { ImageURL } from "./image.ts";
 import { Signer } from "./signer.ts";
 
-export type MiroOptions = {
-  secretKey: string;
-  baseUrl?: string;
-  pathPrefix?: string;
-  allowedOrigins?: URLPatternInit[];
-};
-
-type CreateRequestHandlerOptions = {
+export type CreateRequestHandlerOptions = {
   signer?: Signer;
+  cache?: Cache;
   baseUrl?: string;
   pathPrefix?: string;
   allowedOrigins?: URLPatternInit[];
@@ -19,11 +13,11 @@ type CreateRequestHandlerOptions = {
 };
 
 export function createRequestHandler(
-  options: CreateRequestHandlerOptions,
+  options: CreateRequestHandlerOptions = {},
 ) {
   const {
     signer,
-    baseUrl = import.meta.url,
+    baseUrl,
     pathPrefix = "/miro",
     allowedOrigins = [],
     allowInsecure = false,
@@ -35,7 +29,7 @@ export function createRequestHandler(
     const requestUrl = new URL(request.url);
     const pathname = requestUrl.pathname.replace(pathPrefix, "");
 
-    // Verify the incomming request
+    // Decode the incoming image request
     const image = ImageURL.decode(pathname);
 
     // If we have a signer, unsigned URL's are not allowed
@@ -43,6 +37,7 @@ export function createRequestHandler(
       throw new Error("Insecure URLs are not allowed.");
     }
 
+    // Verify the image request if needed
     const shouldVerify = signer !== undefined;
     const verified = shouldVerify === false ||
       shouldVerify && await signer.verify(image);
@@ -62,7 +57,9 @@ export function createRequestHandler(
     );
 
     if (isRemoteSource && !isAllowedRemote) {
-      throw new Error(`Remote source is not allowed ${sourceUrl}.`);
+      throw new Error(
+        `Remote image did not match an allowedOrigin ${sourceUrl}.`,
+      );
     }
 
     await instantiate();
